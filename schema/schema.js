@@ -2,29 +2,47 @@
 //how data looks like
 
 const graphql = require('graphql');
-const _ = require('lodash');
-const { GraphQLObjectType, GraphQLString, GraphQLInt, GraphQLSchema } = graphql;
+const {
+  GraphQLObjectType,
+  GraphQLString,
+  GraphQLInt,
+  GraphQLSchema,
+  GraphQLList
+} = graphql;
 
-const users = [
-  {
-    id: '1',
-    name: 'Leeroy Jenkins',
-    age: 27
-  },
-  {
-    id: '2',
-    name: 'Henry',
-    age: 27
-  }
-];
+const axios = require('axios');
+const CompanyType = new GraphQLObjectType({
+  name: 'Company',
+  fields: () => ({
+    id: { type: GraphQLString },
+    name: { type: GraphQLString },
+    description: { type: GraphQLString },
+    users: {
+      type: new GraphQLList(UserType),
+      resolve(parentValue, args) {
+        return axios
+          .get(`http://localhost:3000/companies/${parentValue.id}/users`)
+          .then(resp => resp.data);
+      }
+    }
+  })
+});
 
 const UserType = new GraphQLObjectType({
   name: 'User',
-  fields: {
+  fields: () => ({
     id: { type: GraphQLString },
     name: { type: GraphQLString },
-    age: { type: GraphQLInt }
-  }
+    age: { type: GraphQLInt },
+    company: {
+      type: CompanyType,
+      resolve(parentValue, args) {
+        return axios(
+          `http://localhost:3000/companies/${parentValue.companyId}`
+        ).then(resp => resp.data);
+      }
+    }
+  })
 });
 
 const RootQuery = new GraphQLObjectType({
@@ -34,7 +52,19 @@ const RootQuery = new GraphQLObjectType({
       type: UserType,
       args: { id: { type: GraphQLString } },
       resolve(parentValue, args) {
-        return _.find(users, { id: args.id }); //graphql takes care of type coercion
+        //graphql takes care of type coercion
+        return axios
+          .get(`http://localhost:3000/users/${args.id}`)
+          .then(resp => resp.data);
+      }
+    },
+    company: {
+      type: CompanyType,
+      args: { id: { type: GraphQLString } },
+      resolve(parentVal, args) {
+        return axios
+          .get(`http://localhost:3000/companies/${args.id}`)
+          .then(resp => resp.data);
       }
     }
   }
